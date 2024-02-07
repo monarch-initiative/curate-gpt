@@ -1,6 +1,7 @@
 """Chat with a KB."""
 import logging
 import re
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -121,6 +122,7 @@ class ChatAgent(BaseAgent):
             )
             # TODO: use a more precise estimate of the length
             if estimated_length + 300 < max_tokens_by_model(self.extractor.model.model_id):
+                warnings.warn("Prompt too long: estimated length is {estimated_length + 300}, max is {max_tokens_by_model(self.extractor.model.model_id)}")
                 break
             else:
                 # remove least relevant
