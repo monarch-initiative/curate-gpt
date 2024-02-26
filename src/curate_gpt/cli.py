@@ -3,8 +3,11 @@ import csv
 import gzip
 import json
 import logging
+import os
 import sys
+import warnings
 from pathlib import Path
+import random
 from typing import Any, Dict, List, Union
 
 import click
@@ -24,6 +27,7 @@ from curate_gpt.agents.concept_recognition_agent import AnnotationMethod, Concep
 from curate_gpt.agents.dase_agent import DatabaseAugmentedStructuredExtraction
 from curate_gpt.agents.dragon_agent import DragonAgent
 from curate_gpt.agents.evidence_agent import EvidenceAgent
+from curate_gpt.agents.subsumption_eval_agent import SubsumptionEvalAgent
 from curate_gpt.agents.summarization_agent import SummarizationAgent
 from curate_gpt.evaluation.dae_evaluator import DatabaseAugmentedCompletionEvaluator
 from curate_gpt.evaluation.evaluation_datamodel import StratifiedCollection, Task
@@ -36,6 +40,8 @@ from curate_gpt.utils.vectordb_operations import match_collections
 from curate_gpt.wrappers import BaseWrapper, get_wrapper
 from curate_gpt.wrappers.literature.pubmed_wrapper import PubmedWrapper
 from curate_gpt.wrappers.ontology import OntologyWrapper
+
+from oaklib.datamodels.vocabulary import IS_A, PART_OF
 
 __all__ = [
     "main",
@@ -1593,6 +1599,66 @@ def index_ontology_command(ont, path, collection, append, model, index_fields, b
         db.remove_collection(collection, exists_ok=True)
     db.insert(view.objects(), collection=collection, model=model)
     db.update_collection_metadata(collection, object_type="OntologyClass")
+
+
+@ontology.command(name="subsumption")
+@path_option
+@collection_option
+@model_option
+@click.option("--prefix", required=False, default=None, help="Prefix of terms to use, e.g. 'HP:'")
+@click.option('--predicates', multiple=True, help='Predicates of interest (e.g., is_a, part_of)')
+@click.option("--seed", required=False, default=42, help="Seed for random number generator")
+@click.option('--num_terms', required=False, default=1000, help='Number of term pairs to compare')
+@click.option('--choose_subsuming_terms', required=False, default=True, help='Whether to choose subsuming terms or just random terms')
+@click.option("--root_term", required=False, default=None, help="Root term to use for selecting terms to sample")
+@click.option("--output_dir", required=False, default=None, help="Directory to write output to")
+@click.argument("ont")
+def subsumption_command(ont, path, collection, prefix, predicates, seed, num_terms,
+                        choose_subsuming_terms, root_term, output_dir, model, **kwargs):
+    """
+    Compare pairs of ontology terms (optionally where one subsumes the other) to
+    determine whether similarity of LLM embeddings reflect subsumption relationships.
+
+    Example:
+    -------
+        curategpt subsumption  -c obo_hp $db/hp.db
+
+    """
+    oak_adapter = get_adapter(ont)
+    view = OntologyWrapper(oak_adapter=oak_adapter)
+    db = ChromaDBAdapter(path, **kwargs)
+    db.text_lookup = view.text_field
+
+    if not predicates:
+        predicates = [IS_A, PART_OF]
+
+    if model is None:
+        warnings.warn("No model specified, using default model. Note that if you must"
+                      "the same model that was used to build the collection.")
+
+    agent = SubsumptionEvalAgent(knowledge_source=db,
+                                 knowledge_source_collection=collection,
+                                 view=view,
+                                 model=model,
+                                 ont=ont)
+
+    if output_dir and not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+    img_file_name = (os.path.join(output_dir if output_dir else "",
+                                  f"cosine_sim_vs_shared_anc_{ont}_"
+                                  f"sub_{str(choose_subsuming_terms)}.png"))
+    response = (
+        agent.compare_cosine_sim_to_shared_ancestors(
+                                                     num_terms=num_terms,
+                                                     choose_subsuming_terms=
+                                                     choose_subsuming_terms,
+                                                     prefix=prefix,
+                                                     predicates=predicates,
+                                                     root_term=root_term,
+                                                     seed=seed,
+                                                     img_file_name=img_file_name,
+                                                     **kwargs))
+    click.echo(f"r-squared: {response.get('rsquared')}")
 
 
 @main.group()
