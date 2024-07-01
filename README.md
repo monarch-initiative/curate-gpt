@@ -6,7 +6,6 @@
 CurateGPT is a prototype web application and framework for performing general purpose AI-guided curation
 and curation-related operations over *collections* of objects.
 
-
 See also the app on [curategpt.io](https://curategpt.io) (note: this is sometimes down, and may only have a
 subset of the functionality of the local app)
 
