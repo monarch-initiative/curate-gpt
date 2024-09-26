@@ -2443,6 +2443,42 @@ def upload_embeddings(path, collection, repo_id, private, adapter, database_type
         print(f"Error uploading collection to {repo_id}: {e}")
 
 
+# to analyze gene orthology recapitulation
+# 1) make gene embeddings for all human and mouse genes (command = make_gene_embeddings)
+# 2) choose 1000 pairs of orthologous genes and 1000 pairs of non-orthologous genes, and compare LLM embeddings
+# to see if orthology is recapitulated in the embeddings (command = gene_orthology)
+
+@ontology.command(name="make_gene_embeddings")
+@click.option("--monarch_url", required=True, default="https://data.monarchinitiative.org/monarch-kg/2024-02-13/monarch-kg.tar.gz", help="URL for the Monarch knowledge graph")
+@click.option('--gene_prefix', default=["HGNC:", "MGI:"], type=str, multiple=True)
+@click.option('--association_prefix', default=["has_association"], type=str, multiple=True)
+@click.option("--phenotype_prefix", default=["HP:", "MP:"], help="Prefix for phenotypes")
+@click.option("--collection", required=False, default="gene_embeddings", help="Collection name for gene embeddings")
+@click.option("--model_option", required=False, default=None, help="Model to use for embeddings")
+def make_gene_embeddings(monarch_url, gene_prefix, association_prefix, phenotype_prefix, collection, model_option):
+    """Generate LLM embeddings for human and mouse genes and phenotypes.
+
+    Example:
+    -------
+        curategpt gene_orthology --monarch_url $URL --hp_collection hp_index --mp_collection mp_index
+    """
+
+    # Call an agent to:
+    # download Monarch knowledge graph
+    # extract gene and phenotype associations
+    # generate LLM embeddings for human and mouse genes and phenotypes
+    # write out embeddings to a collection
+    pass
+
+@click.option("--monarch_url", required=True, default="https://data.monarchinitiative.org/monarch-kg/2024-02-13/monarch-kg.tar.gz", help="URL for the Monarch knowledge graph")
+@click.option("--collection", required=False, default="gene_embeddings", help="Collection name for gene embeddings")
+@click.option('--gene_prefix', default=["HGNC:", "MGI:"], type=str, multiple=True)
+@click.option("--orthology_biolink_type", required=False, default="biolink:orthologous_to", help="Biolink term for orthology")
+def gene_orthology(monarch_url, collection, gene_prefix, orthology_biolink_type):
+    """Compare LLM embeddings for orthologous and non-orthologous genes.
+    """
+    pass
+
 @main.group()
 def view():
     "Virtual store/wrapper"
